@@ -19,3 +19,9 @@ famTE5mCNum <- famM %>% full_join(famNoM) %>%  # this joins so we have 2 columns
 
 hp <- ggplot(famTE5mCNum,aes(x=Freq5mC)) + geom_histogram(color="black", fill="lightblue") + theme_cowplot(12)
 ggsave("plots/5mC_family_Freq.pdf",hp)
+
+# could combine in one plot but this is also o
+fchp1 <- ggplot(famTE5mCNum,aes(log(x=TotalFamCt))) + geom_histogram(color="black", fill="red") + theme_cowplot(12)
+fchp2 <- ggplot(famTE5mCNum,aes(x=TotalFamCt)) + geom_histogram(color="black", fill="darkred") + theme_cowplot(12)
+comb <- plot_grid(fchp1,fchp2,labels = c('A', 'B'),ncol = 1,align = "v")
+ggsave("plots/TE_family_size.pdf",comb)
