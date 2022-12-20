@@ -1,0 +1,33 @@
+library(tidyverse)
+library(dplyr)
+library(vroom) # speed up reading large files
+library(cowplot)
+infile="data/TE_con_5mc_c.tsv.gz" # compressed files can be read directly
+conTE <- read_tsv(infile,col_names = c("CHROM","SOURCE","TYPE","START","END","SCORE","STRAND","PHASE","GROUP","COUNT_5mC"))
+head(conTE)
+conTE.sp <- conTE %>% mutate(TE_type = str_replace(GROUP,"type=([^;]+);family=.+$","\\1")) %>% 
+  mutate(TE_family = str_replace(GROUP,"^.+family=([^;]+)$","\\1")) %>% select(-c(GROUP,SOURCE,TYPE,PHASE,SCORE))
+##regular expression,str_replace(string,patter,replacement),replace with regular expreesion group 1, matches[^;]-anything but :,+: one or more time,select (-c)exclude
+head(conTE.sp)
+
+conTE.clean <- conTE.sp %>% filter(TE_type != "Simple_repeat" & TE_type != "Low_complexity")
+
+#conTE.clean %>% group_by(TE_family) %>% summarize(famcount = n())
+bigfamNoM <- conTE.clean %>% group_by(TE_type) %>% filter(COUNT_5mC == 0) %>% summarize( No5mC = n())
+write_tsv(bigfamNoM,"M.C.con.bigfamNoM.tsv")
+famNoM <- conTE.clean %>% group_by(TE_family) %>% filter(COUNT_5mC == 0) %>% summarize( No5mC = n()) 
+
+famM <- conTE.clean %>% group_by(TE_family) %>% filter(COUNT_5mC > 0) %>% summarize( With5mC = n())
+famTE5mCNum <- famM %>% full_join(famNoM) %>%  # this joins so we have 2 columns of data summarized
+  replace_na(list(With5mC=0,No5mC=0)) %>% # the join may have some families missing in either set, replace those NAs with 0
+  mutate(TotalFamCt = With5mC + No5mC) %>% # we may want to filter plot by families above a size
+  mutate(Freq5mC = With5mC / TotalFamCt) # also compute a frequency of those w methylation
+
+hp <- ggplot(famTE5mCNum,aes(x=Freq5mC)) + geom_histogram(color="black", fill="lightblue") + theme_cowplot(12)
+ggsave("plots/5mC_family_Freq.pdf",hp)
+
+# could combine in one plot but this is also o
+fchp1 <- ggplot(famTE5mCNum,aes(log(x=TotalFamCt))) + geom_histogram(color="black", fill="red") + theme_cowplot(12)
+fchp2 <- ggplot(famTE5mCNum,aes(x=TotalFamCt)) + geom_histogram(color="black", fill="darkred") + theme_cowplot(12)
+comb <- plot_grid(fchp1,fchp2,labels = c('A', 'B'),ncol = 1,align = "v")
+ggsave("plots/TE_family_size.pdf",comb)
